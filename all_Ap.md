@@ -88,5 +88,113 @@ interface Dot11Radio1.10
    bridge-group 10
 interface Dot11Radio1.20
    encapsulation dot1Q 20
+--------------------------------------------
+AP 2 wifi + nat + vlan +dhcp
+Router
+
+! --- กำหนดทางออกอินเทอร์เน็ต ---
+interface GigabitEthernet0/1 (ขาที่ต่อกับ Modem)
+ ip address dhcp
+ ip nat outside
+ no shutdown
+
+! --- สร้าง Gateway ให้แต่ละ VLAN (Sub-interfaces) ---
+interface GigabitEthernet0/0.10
+ encapsulation dot1Q 10
+ ip address 192.168.10.1 255.255.255.0
+ ip nat inside
+
+interface GigabitEthernet0/0.20
+ encapsulation dot1Q 20
+ ip address 192.168.20.1 255.255.255.0
+ ip nat inside
+
+! --- คำสั่ง NAT เพื่อให้ทุกวงออกเน็ตได้ ---
+access-list 1 permit 192.168.10.0 0.0.0.255
+access-list 1 permit 192.168.20.0 0.0.0.255
+ip nat inside source list 1 interface GigabitEthernet0/1 overload
+
+ip dhcp excluded-address 192.168.10.1
+ip dhcp excluded-address 192.168.20.1
+
+ip dhcp pool STAFF
+ network 192.168.10.0 255.255.255.0
+ default-router 192.168.10.1
+ dns-server 8.8.8.8
+
+ip dhcp pool GUEST
+ network 192.168.20.0 255.255.255.0
+ default-router 192.168.20.1
+ dns-server 8.8.8.8
+
+conf t
+no ip route 0.0.0.0 0.0.0.0 GigabitEthernet0/1
+ip route 0.0.0.0 0.0.0.0 192.168.1.1
+
+SW
+
+vlan 10,20
+
+interface Range f0/1 - 2  (พอร์ตที่เสียบไป Router และ AP)
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20
+
+AP 
+
+conf t
+  dot11 mbssid
+
+dot11 ssid WIFI-STAFF
+   vlan 10
+   authentication open
+   authentication key-management wpa version 2
+   wpa-psk ascii 0 Staff@123
+   mbssid guest-mode
+exit
+
+dot11 ssid WIFI-GUEST
+   vlan 20
+   authentication open
+   authentication key-management wpa version 2
+   wpa-psk ascii 0 Guest@123
+   mbssid guest-mode
+exit
+
+interface Dot11Radio0
+ no shutdown
+ encryption vlan 10 mode ciphers aes-ccm
+ encryption vlan 20 mode ciphers aes-ccm
+ ssid WIFI-STAFF
+ ssid WIFI-GUEST
+exit
+
+interface Dot11Radio1
+ no shutdown
+ encryption vlan 10 mode ciphers aes-ccm
+ encryption vlan 20 mode ciphers aes-ccm
+ ssid WIFI-STAFF
+ ssid WIFI-GUEST
+
+interface GigabitEthernet0
+ no shutdown
+interface GigabitEthernet0.10
+ encapsulation dot1Q 10
+ bridge-group 10
+interface GigabitEthernet0.20
+ encapsulation dot1Q 20
+ bridge-group 20
+
+interface Dot11Radio0.10
+ encapsulation dot1Q 10
+ bridge-group 10
+interface Dot11Radio0.20
+ encapsulation dot1Q 20
+ bridge-group 20
+interface GigabitEthernet0.10
+ encapsulation dot1Q 10
+ bridge-group 10
+interface GigabitEthernet0.20
+ encapsulation dot1Q 20
+ bridge-group 20
    bridge-group 20
   exit
